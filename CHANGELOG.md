@@ -7,6 +7,7 @@ Status: beta.
 
 ### Changes
 - Rebrand: rename the npm package/CLI to `moltbot`, add a `moltbot` compatibility shim, and move extensions to the `@moltbot/*` scope.
+- Models: add ShengSuanYun (胜算云) as a model provider with dynamic model discovery for both LLM and multimodal models (text-to-image, image-to-video, etc.).
 - Commands: group /help and /commands output with Telegram paging. (#2504) Thanks @hougangdev.
 - macOS: limit project-local `node_modules/.bin` PATH preference to debug builds (reduce PATH hijacking risk).
 - macOS: finish Moltbot app rename for macOS sources, bundle identifiers, and shared kit paths. (#2844) Thanks @fal3.
