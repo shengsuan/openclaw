@@ -167,7 +167,7 @@ export async function discoverShengSuanYunModels(): Promise<ModelDefinitionConfi
 
     // console.log(`[shengsuanyun-models] Discovered ${models.length} LLM models`);
     return models;
-  } catch (error) {
+  } catch {
     // console.warn(`[shengsuanyun-models] Discovery failed: ${String(error)}`);
     return [];
   }
@@ -247,7 +247,7 @@ export async function discoverShengSuanYunModalityModels(): Promise<ModelDefinit
 
     // console.log(`[shengsuanyun-modalities] Discovered ${models.length} modality models`);
     return models;
-  } catch (error) {
+  } catch {
     // console.warn(`[shengsuanyun-modalities] Discovery failed: ${String(error)}`);
     return [];
   }
