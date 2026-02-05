@@ -4,6 +4,7 @@ read_when:
   - You want to use ShengSuanYun model router
   - You need ShengSuanYun setup guidance
 ---
+
 # ShengSuanYun (胜算云)
 
 ShengSuanYun provides a unified router for accessing multiple AI model providers through a single API endpoint, supporting both LLM models and multimodal generative models (text-to-image, image-to-video, etc.).
@@ -21,6 +22,7 @@ ShengSuanYun provides a unified router for accessing multiple AI model providers
 ## Features
 
 ### LLM Models
+
 - **Multi-provider access**: Access models from OpenAI, Anthropic, Google, Ali, ByteDance, DeepSeek, Meta, and more
 - **Multiple API formats**: Supports `/v1/chat/completions`, `/v1/messages`, and `/v1/responses`
 - **Streaming**: ✅ Supported on all compatible models
@@ -29,6 +31,7 @@ ShengSuanYun provides a unified router for accessing multiple AI model providers
 - **Dynamic model discovery**: Models are automatically discovered from the API
 
 ### Multimodal Models
+
 - **Text-to-Image**: GPT-Image, Doubao-Seedream, Qwen-Image-Plus, Flux models
 - **Text-to-Video**: Veo3.1, Sora2, 通义万相 (Wanxiang) models
 - **Image-to-Video**: Doubao-Seedance, Wanxiang image-to-video models
@@ -60,9 +63,9 @@ Add to your `moltbot.json`:
   env: { SHENGSUANYUN_API_KEY: "your-api-key" },
   agents: {
     defaults: {
-      model: { primary: "shengsuanyun/anthropic/claude-opus-4.5" }
-    }
-  }
+      model: { primary: "shengsuanyun/anthropic/claude-opus-4.5" },
+    },
+  },
 }
 ```
 
@@ -93,21 +96,25 @@ ShengSuanYun provides access to hundreds of models from various providers. Model
 Multimodal models use the prefix `modality/{id}` format:
 
 #### Text-to-Image Models
+
 - **GPT-Image**: OpenAI's image generation models
 - **Doubao-Seedream**: ByteDance's text-to-image models (4.5 series)
 - **Qwen-Image-Plus**: Ali's advanced image generation
 - **Flux**: BlackForestLabs' high-quality image models
 
 #### Text-to-Video Models
+
 - **Veo3.1**: Google's video generation model
 - **Sora2**: OpenAI's video generation model
 - **通义万相 (Wanxiang)**: Ali's text-to-video models (2.2-Plus)
 
 #### Image-to-Video Models
+
 - **Doubao-Seedance**: ByteDance's image-to-video conversion
 - **通义万相 (Wanxiang)**: Ali's image-to-video models (2.5, 2.6)
 
 #### Image-to-Image Models
+
 - **Flux-kontext-pro**: Advanced image editing
 - **通义万相 (Wanxiang)**: Ali's image editing models (2.5)
 
@@ -149,6 +156,7 @@ Moltbot automatically discovers models from two ShengSuanYun APIs when `SHENGSUA
    - Over 200+ models available
 
 Each model includes:
+
 - Model ID and name
 - Company/provider information
 - Context window size and max tokens (for LLMs)
@@ -162,11 +170,11 @@ Each model includes:
 
 ShengSuanYun supports multiple API formats:
 
-| API Format | Endpoint | Compatible With |
-|------------|----------|-----------------|
-| OpenAI Completions | `/v1/chat/completions` | OpenAI SDK |
-| Anthropic Messages | `/v1/messages` | Claude SDK |
-| OpenAI Responses | `/v1/responses` | OpenAI SDK |
+| API Format         | Endpoint               | Compatible With |
+| ------------------ | ---------------------- | --------------- |
+| OpenAI Completions | `/v1/chat/completions` | OpenAI SDK      |
+| Anthropic Messages | `/v1/messages`         | Claude SDK      |
+| OpenAI Responses   | `/v1/responses`        | OpenAI SDK      |
 
 Moltbot automatically uses the appropriate API format based on the model's capabilities, preferring the OpenAI completions format when available.
 
@@ -210,8 +218,8 @@ Full configuration in `moltbot.json`:
   env: { SHENGSUANYUN_API_KEY: "your-api-key" },
   agents: {
     defaults: {
-      model: { primary: "shengsuanyun/anthropic/claude-opus-4.5" }
-    }
+      model: { primary: "shengsuanyun/anthropic/claude-opus-4.5" },
+    },
   },
   models: {
     mode: "merge",
@@ -220,16 +228,17 @@ Full configuration in `moltbot.json`:
         baseUrl: "https://router.shengsuanyun.com/api/v1",
         apiKey: "${SHENGSUANYUN_API_KEY}",
         api: "openai-completions",
-        models: []  // Models are auto-discovered
-      }
-    }
-  }
+        models: [], // Models are auto-discovered
+      },
+    },
+  },
 }
 ```
 
 ## Pricing
 
 ShengSuanYun uses its own pricing model. Check the ShengSuanYun dashboard for current rates per model. Pricing varies by:
+
 - Model provider
 - Model size and capability
 - Input/output tokens
