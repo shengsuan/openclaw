@@ -16,10 +16,8 @@ import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
-import {
-  createShengSuanYunGenerationTool,
-  createShengSuanYunStatusTool,
-} from "./tools/shengsuanyun-generation-tool.js";
+import { createGemini3ProImageTool } from "./tools/shengsuanyun/gemini3pro-image-preview.ts";
+import { createZImageTurboTool } from "./tools/shengsuanyun/zimage-turbo.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 
@@ -70,17 +68,11 @@ export function createOpenClawTools(options?: {
         modelHasVision: options?.modelHasVision,
       })
     : null;
-  const shengSuanYunGenerationTool = options?.agentDir?.trim()
-    ? createShengSuanYunGenerationTool({
-        config: options?.config,
-        agentDir: options.agentDir,
-      })
+  const ZImageTurboTool = options?.agentDir?.trim()
+    ? createZImageTurboTool({ config: options?.config })
     : null;
-  const shengSuanYunStatusTool = options?.agentDir?.trim()
-    ? createShengSuanYunStatusTool({
-        config: options?.config,
-        agentDir: options.agentDir,
-      })
+  const Gemini3ProImageTool = options?.agentDir?.trim()
+    ? createGemini3ProImageTool({ config: options?.config })
     : null;
   const webSearchTool = createWebSearchTool({
     config: options?.config,
@@ -162,8 +154,8 @@ export function createOpenClawTools(options?: {
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
-    ...(shengSuanYunGenerationTool ? [shengSuanYunGenerationTool] : []),
-    ...(shengSuanYunStatusTool ? [shengSuanYunStatusTool] : []),
+    ...(ZImageTurboTool ? [ZImageTurboTool] : []),
+    ...(Gemini3ProImageTool ? [Gemini3ProImageTool] : []),
   ];
 
   const pluginTools = resolvePluginTools({
