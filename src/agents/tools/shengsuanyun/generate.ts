@@ -39,9 +39,8 @@ async function generate(
     if (data.code != "success" || !data.data?.request_id) {
       return { success: false, error: data.message || "No image URL returned in response" };
     }
-    let trys = 0;
-    while (trys < 18) {
-      trys += 1;
+    let errorCount = 0;
+    while (true) {
       try {
         const imgs = await fetch(
           `${SHENGSUANYUN_BASE_URL}/tasks/generations/${data.data?.request_id}`,
@@ -55,13 +54,12 @@ async function generate(
           },
         );
         if (!imgs.ok) {
-          await new Promise((resolve) => setTimeout(resolve, 20000));
-          continue;
+          throw new Error("Network error");
         }
+
         const img_urls = (await imgs.json()) as TaskRes;
         if (img_urls.code != "success") {
-          await new Promise((resolve) => setTimeout(resolve, 20000));
-          continue;
+          throw img_urls.message;
         }
         if (img_urls.data?.status === "FAILED") {
           return {
@@ -69,16 +67,32 @@ async function generate(
             error: img_urls.data?.fail_reason || "Image generation failed",
           };
         }
-        if (img_urls.data?.data?.progress == 100) {
+        const currentProgress = img_urls.data?.data?.progress || 0;
+        if (currentProgress >= 100 || img_urls.data?.status === "SUCCEEDED") {
           return { success: true, Urls: img_urls.data?.data?.image_urls };
         }
-        await new Promise((resolve) => setTimeout(resolve, 20000));
+        let waitTime = 10000;
+
+        if (currentProgress >= 90) {
+          waitTime = 2000;
+        } else if (currentProgress >= 60) {
+          waitTime = 5000;
+        } else if (currentProgress >= 30) {
+          waitTime = 10000;
+        } else {
+          waitTime = 15000;
+        }
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        errorCount = 0;
       } catch (e) {
-        console.log("createZImageTurboTool() error:", e);
-        await new Promise((resolve) => setTimeout(resolve, 20000));
+        if (errorCount > 3) {
+          console.log("polling error:", e);
+          throw e;
+        }
+        errorCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
-    return { success: false, error: "6 minutes timeout!" };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }

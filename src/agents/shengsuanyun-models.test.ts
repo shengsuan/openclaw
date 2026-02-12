@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  discoverShengSuanYunModels,
-  discoverShengSuanYunModalityModels,
-  discoverAllShengSuanYunModels,
+  getShengSuanYunModels,
+  getShengSuanYunModalityModels,
   SHENGSUANYUN_BASE_URL,
   SHENGSUANYUN_MODALITIES_BASE_URL,
 } from "./shengsuanyun-models.js";
@@ -14,17 +13,12 @@ describe("ShengSuanYun provider", () => {
   });
 
   it("should skip LLM discovery in test environment", async () => {
-    const models = await discoverShengSuanYunModels();
+    const models = await getShengSuanYunModels();
     expect(models).toEqual([]);
   });
 
   it("should skip multimodal discovery in test environment", async () => {
-    const models = await discoverShengSuanYunModalityModels();
-    expect(models).toEqual([]);
-  });
-
-  it("should skip all model discovery in test environment", async () => {
-    const models = await discoverAllShengSuanYunModels();
+    const models = await getShengSuanYunModalityModels();
     expect(models).toEqual([]);
   });
 });
