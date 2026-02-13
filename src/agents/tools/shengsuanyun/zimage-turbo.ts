@@ -124,7 +124,7 @@ export function createZImageTurboTool(opts?: { config?: OpenClawConfig }): AnyAg
       const cfg = opts?.config ?? loadConfig();
       const resolved = await resolveApiKeyForProvider({ provider: "shengsuanyun", cfg });
       if (!resolved.apiKey) {
-        throw new Error("ShengSuanYun API key not configured");
+        throw new Error("胜算云 API key 未配置");
       }
       const result = await generateImage({ prompt, size, apiKey: resolved.apiKey });
       if (result.success && result.imageUrls) {

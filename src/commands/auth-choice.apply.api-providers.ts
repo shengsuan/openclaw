@@ -840,7 +840,6 @@ export async function applyAuthChoiceApiProviders(
       await setShengSuanYunApiKey(normalizeApiKeyInput(params.opts.token), params.agentDir);
       hasCredential = true;
     }
-
     if (!hasCredential) {
       const envKey = resolveEnvApiKey("shengsuanyun");
       if (envKey) {
@@ -856,8 +855,16 @@ export async function applyAuthChoiceApiProviders(
     }
 
     if (!hasCredential) {
+      await params.prompter.note(
+        [
+          "简单好用、专为AI编程严选顶尖大模型，让您畅享编程，无忧创未来！",
+          "创建 API key: https://console.shengsuanyun.com/user/keys",
+        ].join("\n"),
+        "胜算云",
+      );
+
       const key = await params.prompter.text({
-        message: "Enter ShengSuanYun API key",
+        message: "输入胜算云 API key",
         validate: validateApiKeyInput,
       });
       await setShengSuanYunApiKey(normalizeApiKeyInput(String(key)), params.agentDir);

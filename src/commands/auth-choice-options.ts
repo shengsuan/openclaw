@@ -42,6 +42,12 @@ const AUTH_CHOICE_GROUP_DEFS: {
   choices: AuthChoice[];
 }[] = [
   {
+    value: "shengsuanyun",
+    label: "胜算云",
+    hint: "胜算云 API key",
+    choices: ["shengsuanyun-api-key"],
+  },
+  {
     value: "openai",
     label: "OpenAI",
     hint: "Codex OAuth + API key",
@@ -144,12 +150,6 @@ const AUTH_CHOICE_GROUP_DEFS: {
     choices: ["venice-api-key"],
   },
   {
-    value: "shengsuanyun",
-    label: "Sheng Suan Yun",
-    hint: "API key",
-    choices: ["shengsuanyun-api-key"],
-  },
-  {
     value: "cloudflare-ai-gateway",
     label: "Cloudflare AI Gateway",
     hint: "Account ID + Gateway ID + API key",
@@ -164,6 +164,7 @@ export function buildAuthChoiceOptions(params: {
   void params.store;
   const options: AuthChoiceOption[] = [];
 
+  options.push({ value: "shengsuanyun-api-key", label: "胜算云 API key" });
   options.push({
     value: "token",
     label: "Anthropic token (paste setup-token)",
@@ -204,7 +205,6 @@ export function buildAuthChoiceOptions(params: {
     label: "Kimi Code API key (subscription)",
   });
   options.push({ value: "synthetic-api-key", label: "Synthetic API key" });
-  options.push({ value: "shengsuanyun-api-key", label: "ShengSuanYun API key" });
   options.push({
     value: "venice-api-key",
     label: "Venice AI API key",

@@ -153,9 +153,12 @@ export async function promptDefaultModel(
     });
   }
 
-  const providers = Array.from(new Set(models.map((entry) => entry.provider))).toSorted((a, b) =>
-    a.localeCompare(b),
-  );
+  const providers = [
+    "shengsuanyun",
+    ...Array.from(new Set(models.map((entry) => entry.provider)))
+      .filter((it) => it != "shengsuanyun")
+      .toSorted((a, b) => a.localeCompare(b)),
+  ];
 
   const hasPreferredProvider = preferredProvider ? providers.includes(preferredProvider) : false;
   const shouldPromptProvider =
@@ -169,7 +172,7 @@ export async function promptDefaultModel(
           const count = models.filter((entry) => entry.provider === provider).length;
           return {
             value: provider,
-            label: provider,
+            label: provider == "shengsuanyun" ? "胜算云" : provider,
             hint: `${count} model${count === 1 ? "" : "s"}`,
           };
         }),

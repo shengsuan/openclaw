@@ -126,7 +126,7 @@ async function loadShengSuanYunTools(opts?: { config?: OpenClawConfig }): Promis
         const cfg = opts?.config ?? loadConfig();
         const resolved = await resolveApiKeyForProvider({ provider: "shengsuanyun", cfg });
         if (!resolved.apiKey) {
-          throw new Error("ShengSuanYun API key not configured");
+          throw new Error("胜算云 API key 未配置。");
         }
         const params = args as Record<string, unknown>;
         const apiParams: Record<string, unknown> = { model: model.api_name };

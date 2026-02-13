@@ -121,7 +121,7 @@ export function createGemini3ProImageTool(opts?: { config?: OpenClawConfig }): A
       const cfg = opts?.config ?? loadConfig();
       const resolved = await resolveApiKeyForProvider({ provider: "shengsuanyun", cfg });
       if (!resolved.apiKey) {
-        throw new Error("ShengSuanYun API key not configured");
+        throw new Error("胜算云 API key 未配置");
       }
       const result = await generateImage({
         prompt,

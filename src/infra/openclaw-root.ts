@@ -2,8 +2,9 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import pkg from "../../package.json" with { type: "json" };
 
-const CORE_PACKAGE_NAMES = new Set(["openclaw"]);
+const CORE_PACKAGE_NAMES = new Set([pkg.name]);
 
 async function readPackageName(dir: string): Promise<string | null> {
   try {
