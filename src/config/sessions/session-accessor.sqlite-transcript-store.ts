@@ -20,7 +20,6 @@ import type {
 import {
   createTranscriptIdentityReader,
   findTranscriptEventInDatabase,
-  loadTranscriptEventsFromDatabase,
   readTranscriptEventId,
   readTranscriptEventMessage,
   readTranscriptIdentityByEventId,
@@ -46,11 +45,6 @@ import {
 } from "./session-transcript-index.js";
 import { startSessionTranscriptIndexReconcile } from "./session-transcript-reconcile.js";
 import { createSessionTranscriptHeader } from "./transcript-header.js";
-import {
-  isSessionTranscriptLeafControl,
-  parseSessionTranscriptTreeEntry,
-} from "./transcript-tree.js";
-import { resolveVisibleTranscriptAppendParentId } from "./transcript-visible-events.js";
 
 type TranscriptAppendOptions = {
   allowStoredAlias?: boolean;
@@ -70,7 +64,7 @@ type TranscriptAppendCursor = {
   insertIdentity?: ReturnType<typeof createTranscriptIdentityInserter>;
 };
 
-function createTranscriptEventInserter(database: OpenClawAgentDatabase, sessionId: string) {
+export function createTranscriptEventInserter(database: OpenClawAgentDatabase, sessionId: string) {
   return prepareSqliteQuerySync<{ seq: number; eventJson: string; createdAt: number }>(
     database.db,
     (parameter) =>
@@ -275,8 +269,6 @@ export function appendTranscriptEventsInTransaction(
 }
 
 function appendTranscriptEventRowInTransaction(
-  database: OpenClawAgentDatabase,
-  scope: ResolvedTranscriptScope,
   event: TranscriptEvent,
   seq: number,
   state: {
@@ -284,6 +276,7 @@ function appendTranscriptEventRowInTransaction(
     seenMessageIdempotencyKeys: Set<string>;
     insertEvent: ReturnType<typeof createTranscriptEventInserter>;
     insertIdentity: ReturnType<typeof createTranscriptIdentityInserter>;
+    appendToIndex: ReturnType<typeof createTranscriptIndexAppenderInTransaction>;
   },
   createdAtOverride?: number,
 ): boolean {
@@ -294,8 +287,7 @@ function appendTranscriptEventRowInTransaction(
     return false;
   }
   state.insertEvent({ seq, eventJson: JSON.stringify(persistedEvent), createdAt });
-  const appendToIndex = createTranscriptIndexAppenderInTransaction(database.db, scope.sessionId);
-  appendToIndex({
+  state.appendToIndex({
     seq,
     event: persistedEvent,
     eventId: identity?.eventId ?? null,
@@ -337,62 +329,6 @@ export function ensureTranscriptHeader(
     database,
     scope,
     createSessionTranscriptHeader({ cwd, sessionId: scope.sessionId }),
-  );
-}
-
-export function readActiveTranscriptAppendParentId(
-  database: OpenClawAgentDatabase,
-  sessionId: string,
-): string | null {
-  const db = getSessionKysely(database.db);
-  const latest = executeSqliteQueryTakeFirstSync(
-    database.db,
-    db
-      .selectFrom("transcript_event_identities as ti")
-      .innerJoin("transcript_events as te", (join) =>
-        join.onRef("te.session_id", "=", "ti.session_id").onRef("te.seq", "=", "ti.seq"),
-      )
-      .select(["ti.event_type", "te.event_json"])
-      .where("ti.session_id", "=", sessionId)
-      .orderBy("ti.seq", "desc")
-      .limit(1),
-  );
-  if (!latest) {
-    return null;
-  }
-  try {
-    const event = JSON.parse(latest.event_json) as unknown;
-    const treeEntry = parseSessionTranscriptTreeEntry(event);
-    if (!treeEntry) {
-      return resolveVisibleTranscriptAppendParentId(
-        loadTranscriptEventsFromDatabase(database, sessionId),
-      );
-    }
-    if (latest.event_type !== "leaf") {
-      return treeEntry.appendParentId;
-    }
-    const leafReferencesKnown =
-      treeEntry.leafId !== undefined &&
-      transcriptTreeReferenceExists(database, sessionId, treeEntry.leafId) &&
-      transcriptTreeReferenceExists(database, sessionId, treeEntry.appendParentId);
-    if (isSessionTranscriptLeafControl(event) && leafReferencesKnown) {
-      return treeEntry.appendParentId;
-    }
-  } catch {
-    // Fall through to the tolerant full-tree resolver.
-  }
-  return resolveVisibleTranscriptAppendParentId(
-    loadTranscriptEventsFromDatabase(database, sessionId),
-  );
-}
-
-function transcriptTreeReferenceExists(
-  database: OpenClawAgentDatabase,
-  sessionId: string,
-  eventId: string | null,
-): boolean {
-  return (
-    eventId === null || readTranscriptIdentityByEventId(database, sessionId, eventId) !== undefined
   );
 }
 
@@ -447,12 +383,12 @@ export function replaceSqliteTranscriptEventsInTransaction(
     seenMessageIdempotencyKeys: new Set<string>(),
     insertEvent: createTranscriptEventInserter(database, resolved.sessionId),
     insertIdentity: createTranscriptIdentityInserter(database, resolved.sessionId, false),
+    // The reset/dirty transition above owns the initial projection state for this whole batch.
+    appendToIndex: createTranscriptIndexAppenderInTransaction(database.db, resolved.sessionId),
   };
   for (const [eventIndex, event] of events.entries()) {
     if (
       appendTranscriptEventRowInTransaction(
-        database,
-        resolved,
         event,
         seq,
         state,

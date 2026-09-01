@@ -172,6 +172,63 @@ existing temporary directories, Node or Vitest caches, or other global caches. S
 validators; it does not require `TSX_DISABLE_CACHE` in the invoking shell. Raw
 external `tsx` and `node --import tsx` invocations outside these launchers are unchanged.
 
+### Source tests and subprocess builds
+
+Non-watch runs through `pnpm test` or `scripts/run-vitest.mjs` keep Vitest tests
+and runtime parents on TypeScript. Importing a declared subprocess entrypoint
+compiles the fixed test entry set and its workspace dependencies into one fresh
+invocation directory under `.artifacts/vitest-workers/`.
+
+The ten declared application entries run as plain Node JavaScript without a
+TypeScript loader: SQLite read-only snapshots, database verification, Tailscale
+route ownership, the service relay, its POSIX and Windows anchors, the memory
+plugin's KNN child, session transcript archive and reconciliation workers, and
+managed GitHub credential resolution. The same generation also compiles the fake-backend TUI
+fixture's four runtime roots together: the real TUI, embedded reply producer,
+reply metadata reader, and outbound normalizer. Shared chunks preserve their
+module and WeakMap identity. Generated TUI fixtures remain `.mts` files: Node
+launches them with `--import tsx` for their own syntax, while Bun handles that
+syntax natively without the Node loader. Only their runtime imports change.
+Existing package build entry paths and Vitest source parents stay unchanged. Other
+Worker-thread entries and arbitrary source CLI fixtures remain outside this declared set.
+
+Preparation is lazy across both projects and shards. Config imports, listing
+tests, and tiny tests that do not import these declarations do not load the
+subprocess compiler or compile workers. A shard that needs a declaration requests the
+outer runner's single build through its existing Node IPC channel during module
+collection, before fixture hooks and readiness deadlines. Every finite invocation
+that needs a declaration pays for this fixed entry set; preparation timing is
+reported separately from child execution. The runner starts one short-lived native
+Node or Bun compiler child and joins it before returning the verified manifest to
+borrowers. The compiler module graph lives in that child, not the long-lived runner
+or Vitest worker. No shard can select a different build graph or adopt another invocation's output. The outer
+runner retains the generation until child close and process-group cleanup
+finish, then verifies it before reporting success. Standalone Vitest and watch runs retain
+source execution: its public close hooks run concurrently with pool shutdown,
+so compilation and artifact deletion require the repository runner's ownership.
+A lost owner or failed build fails the run.
+Disposal cancels pending compilation and joins it and every borrower before
+removing the directory. An uncertain compiler or borrower join retains the
+generation and fails the run. Abnormal termination can also leave an unused
+directory; later runs never adopt it.
+
+Every preparation compiles current source; checkout `dist/` is neither an input
+nor a fallback. Build errors, missing artifacts, and changes to recorded build
+inputs fail the run. Compilation includes the native subprocess fixtures before
+they impose resource limits. Third-party dependencies remain external except for
+the always-bundled OpenClaw packages. Each generation carries all seven fs-safe
+native helpers in its own private tree, using the package runtime's loader-relative
+layout. The package itself shares one native tree between runtime entries and its
+sealed worker; it does not copy a second tree beside that worker. The helpers'
+original source hashes are pinned before copying and verified alongside compiler
+output; missing or altered assets fail verification. The default stays off, and
+the existing `off`/`auto`/`require` opt-ins retain their behavior.
+
+Watch mode deliberately keeps the existing live-source path, including tsx for
+Node subprocesses and native TypeScript handling for Bun. It creates no prepared generation, so a new child launch
+reads current source rather than reusing a compiled snapshot. Existing Vitest
+watch dependency tracking still determines when tests rerun.
+
 Test wrapper runs end with a short `[test] passed|failed|skipped ... in ...` summary; Vitest's own duration line stays the per-shard detail.
 
 | Command                                           | What it does                                                                                                                                                                                                                                                                                                                                          |
@@ -215,6 +272,15 @@ detached descendants stopped. Before manually removing an abandoned lock directo
 inspect its `owner.json` and verify all associated build, compiler, and lint
 processes, including detached descendants, have stopped; then retry the command.
 
+Lint reports its final failure on stderr after child joins and artifact ownership
+have settled, including retained ownership when cleanup is uncertain. Standalone
+Oxlint and its shard CLI end with `[oxlint] FAILED (exit N)`; `pnpm lint` owns the
+whole pipeline and ends with one `[lint] FAILED (exit N)` instead. Shard progress
+distinguishes `passed` from `failed (exit N)`, and stdout remains available for
+machine-readable tool output. Successful runs have no failure trailer. Signals
+forwarded during child execution and shard timeouts fail the command; whole-host
+loss or `SIGKILL` of the reporting process can prevent a final line.
+
 Local plugin lint and package-boundary compilation consume native declarations in
 `packages/plugin-sdk/dist` and seven separate plugin API trees in
 `.artifacts/extension-package-boundary/plugins`. Each declaration and compile
@@ -227,11 +293,17 @@ then drives obsolete declaration pruning. Missing or tampered outputs invalidate
 the owner. The content records live under
 `.artifacts/extension-package-boundary`, outside packaged build cleanup. A warm run validates the records without emitting declarations.
 
-Packaged declarations belong to the public/private tsdown SDK groups. Full and
-package builds emit them in the canonical build; `ciArtifacts` stages only those
-two groups and publishes after both succeed and their relative declaration closure
-is complete. Local preparation never overwrites packaged declarations or writes
-workspace forwarding bridges.
+Packaged SDK declarations belong to one staged owner shared by full, package, and
+`ciArtifacts` builds. It serializes the two canonical tsdown SDK groups on a miss
+and caches their complete staged generation. Each successful compiler supplies its
+source membership through a private staged receipt; missing receipts or inputs
+changed during compilation prevent publication. The shared input snapshot policy
+validates consumed bytes, inherited configuration, generator and manifest inputs,
+and resolution topology without starting a compiler on hits. Cache hits restore
+into fresh staging and pass the same entry and relative declaration closure checks
+before publication.
+Local preparation never overwrites packaged declarations or writes workspace
+forwarding bridges.
 
 Plugin SDK declaration preparation and `scripts/run-tsgo.mjs` require child work
 to finish before reporting success. On POSIX, each verifies its own managed
@@ -273,6 +345,40 @@ not sweep old directories or infer ownership from names, ages, or PIDs.
 - Selected `plugin-sdk` and `commands` test files route through dedicated light lanes that keep only `test/setup.ts`, leaving runtime-heavy cases on their existing lanes.
 - Base Vitest config defaults to `pool: "threads"` and `isolate: false`, with the shared non-isolated runner enabled across repo configs.
 - `pnpm test:channels` runs `vitest.channels.config.ts`.
+
+### Retained mocked Control UI proof
+
+Ordinary mocked browser screenshots, recordings, and reports use fresh directories
+for each test attempt or standalone capture invocation. The Node-only
+`createControlUiE2eArtifactDir(scope, parentDir?)` helper in
+`ui/src/test-helpers/control-ui-e2e-artifacts.ts` prints the actual allocated path.
+An explicit parent wins; otherwise it uses the trimmed existing
+`OPENCLAW_UI_E2E_ARTIFACT_DIR`, then the repository's `.artifacts/control-ui-e2e`
+parent. Existing feature-specific directory controls and script output arguments
+select parents, with unique children beneath them. Explicit screenshot filename
+controls preserve the basename and print the relocated path.
+
+Keep capture gates independent from allocation: `OPENCLAW_CAPTURE_UI_PROOF`,
+`OPENCLAW_UI_E2E_RECORD`, and output-presence gates retain their existing meanings.
+Allocate during scenario execution or `beforeEach`, and pass the same owner to
+shared capture helpers so screenshots, reports, and video stay together. Distinguish
+stage names within an attempt. Close the browser context before finalizing video.
+
+Successful and failed evidence is retained. Cleanup is manual: remove only exact
+directories that you own and have finished reviewing. Never recursively delete
+the shared parent before a replay. Disposable build/media fixtures and temporary
+raw video have their own cleanup. New captures cannot recover overwritten evidence;
+do not describe a replay as recovery of lost files.
+
+Timeout diagnostics allocate fresh children beneath the existing
+`OPENCLAW_UI_E2E_DIAGNOSTIC_DIR` or default timeout directory, keeping each PNG and
+JSON report together. Mantis allocates an invocation directory for setup logs,
+capture attempts, and its report; the builder preserves each attempt's relative
+paths and refuses to overwrite an existing report.
+
+Separate output owners remain: real-Gateway suites, `chat-outbox-*`, and
+`chat-attachment-read-lifecycle`. Do not assume those owners have the ordinary
+mocked proof retention guarantee.
 
 ## Gateway and E2E
 
