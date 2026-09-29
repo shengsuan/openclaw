@@ -1,8 +1,8 @@
 import {
   GATEWAY_EVENT_UPDATE_AVAILABLE,
+  GATEWAY_EVENT_UPDATE_RUN_CHANGED,
   type GatewayUpdateAvailableEventPayload,
 } from "../../../src/gateway/events.js";
-import type { GatewayEventFrame } from "../api/gateway.ts";
 import { t } from "../i18n/index.ts";
 import {
   closeDevicePairSetup as closeDevicePairSetupState,
@@ -41,15 +41,13 @@ import {
   type ApplicationUpdateOverlayHooks,
 } from "./overlays-updates.ts";
 
-function isGatewayEvent(value: unknown): value is GatewayEventFrame {
-  return Boolean(value && typeof value === "object" && "event" in value);
-}
-
 export function createApplicationOverlays(
   gateway: ApplicationGateway,
   hooks: ApplicationUpdateOverlayHooks = {},
 ): ApplicationOverlays {
   const updates = createApplicationUpdateOverlays(gateway, publish, hooks);
+  const runConnectionBootstrap = (key: string, task: () => Promise<unknown>) =>
+    hooks.connectionBootstrap?.run(key, task) ?? task();
   let snapshot: ApplicationOverlaySnapshot = {
     ...updates.snapshot,
     approvalQueue: [],
@@ -183,43 +181,47 @@ export function createApplicationOverlays(
     }
     if (connected && !operatorAccess.canReviewApprovals) {
       approvalDecision = null;
+    }
+    if (!connected || !next.client || !operatorAccess.canReviewApprovals) {
       promptState.execApprovalQueue = [];
       promptState.execApprovalBusy = false;
       promptState.execApprovalErrors.clear();
       clearExecApprovalTimers(promptState);
     }
     if (!connected || !next.client) {
-      promptState.execApprovalQueue = [];
-      promptState.execApprovalBusy = false;
-      promptState.execApprovalErrors.clear();
       if (next.phase !== "reload-required" && !next.client) {
         connectedEpoch = 0;
       }
-      clearExecApprovalTimers(promptState);
       updates.synchronizeGateway(next);
       return;
     }
+    const connectedClient = next.client;
     updates.synchronizeGateway(next);
     if (
       accessTransition.pairingChanged &&
       devicePairSetupState.devicePairSetupOpen &&
       (operatorAccess.canAdmin || operatorAccess.canPair)
     ) {
-      void pairingPendingCount.refresh();
+      void runConnectionBootstrap("pairing-pending-count", () =>
+        pairingPendingCount.refresh(),
+      ).catch(() => undefined);
     }
     if (connectedSourceChanged) {
       connectedEpoch += 1;
-      if (operatorAccess.canReviewApprovals) {
-        void refreshApprovals(next.client, connectedEpoch, approvalAccessGeneration);
-      }
-    } else if (accessTransition.reviewChanged && operatorAccess.canReviewApprovals) {
-      void refreshApprovals(next.client, connectedEpoch, approvalAccessGeneration);
+    }
+    if (
+      (connectedSourceChanged || accessTransition.reviewChanged) &&
+      operatorAccess.canReviewApprovals
+    ) {
+      void runConnectionBootstrap("approvals", () =>
+        refreshApprovals(connectedClient, connectedEpoch, approvalAccessGeneration),
+      ).catch(() => undefined);
     }
   };
   const stopGateway = gateway.subscribe(synchronizeGateway);
 
   const stopEvents = gateway.subscribeEvents((event) => {
-    if (disposed || !isGatewayEvent(event)) {
+    if (disposed) {
       return;
     }
     if (event.event === "device.pair.setup.completed") {
@@ -244,6 +246,10 @@ export function createApplicationOverlays(
       updates.handleUpdateAvailable(
         event.payload as GatewayUpdateAvailableEventPayload | undefined,
       );
+      return;
+    }
+    if (event.event === GATEWAY_EVENT_UPDATE_RUN_CHANGED) {
+      updates.handleUpdateRunChanged(event.payload);
       return;
     }
     if (
@@ -275,8 +281,11 @@ export function createApplicationOverlays(
       return () => listeners.delete(listener);
     },
     refreshUpdateStatus: updates.refreshUpdateStatus,
+    acknowledgeUpdateRun: updates.acknowledgeUpdateRun,
     runUpdate: updates.runUpdate,
     holdUpdate: updates.holdUpdate,
+    diagnoseUpdateFailure: updates.diagnoseUpdateFailure,
+    reportUpdateFailure: updates.reportUpdateFailure,
     async decideApproval(decision, approvalId, projectedApproval) {
       const active = approvalId
         ? (promptState.execApprovalQueue.find((entry) => entry.id === approvalId) ??

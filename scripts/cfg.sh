@@ -1,8 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-CFG_DIR="${OPENCLAW_HOME:-/home/node}/.openclaw"
-INITIALIZED_FLAG="${OPENCLAW_HOME:-/home/node}/.openclaw/.initialized"
+# 与 openclaw 的状态目录解析保持一致：OPENCLAW_STATE_DIR 优先，其次 OPENCLAW_HOME。
+if [ -n "${OPENCLAW_STATE_DIR:-}" ]; then
+    CFG_DIR="${OPENCLAW_STATE_DIR}"
+else
+    CFG_DIR="${OPENCLAW_HOME:-/home/node}/.openclaw"
+fi
+INITIALIZED_FLAG="${CFG_DIR}/.initialized"
 RESTART_COUNT=0
 GATEWAY_PID=""
 
@@ -58,6 +63,8 @@ fi
 RESTART_COUNT=$(cat "$INITIALIZED_FLAG" 2>/dev/null || echo "0")
 NEW_COUNT=$((RESTART_COUNT + 1))
 echo "$NEW_COUNT" > "$INITIALIZED_FLAG"
+echo "[INFO] 清理残留锁文件..."
+find "${CFG_DIR}/agents" -name '*.lock' -delete 2>/dev/null || true
 echo "[INFO] 启动网关（重启次数: $NEW_COUNT）"
 start_gateway
 echo "[INFO] 网关运行中，等待进程结束..."

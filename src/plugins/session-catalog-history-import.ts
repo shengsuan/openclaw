@@ -3,6 +3,7 @@ import type {
   SessionCatalogTranscriptItem,
   SessionsCatalogReadResult,
 } from "../../packages/gateway-protocol/src/schema/sessions-catalog.js";
+import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { AgentMessage } from "../plugin-sdk/agent-core.js";
 import { withSessionTranscriptWriteLock } from "../plugin-sdk/session-transcript-runtime.js";
@@ -42,23 +43,30 @@ function importedSessionCatalogMessage(params: {
           : params.item.type === "other"
             ? "Other\n\n"
             : "";
+  return sessionCatalogAssistantMessage(
+    `${prefix}${text}`,
+    timestamp,
+    params.catalogId,
+    params.item.model ?? "native-history",
+  );
+}
+
+function sessionCatalogAssistantMessage(
+  text: string,
+  timestamp: number,
+  provider: string,
+  model: string,
+): AgentMessage {
   return {
     role: "assistant",
-    content: [{ type: "text", text: `${prefix}${text}` }],
+    content: [{ type: "text", text }],
     timestamp,
     api: "openai-responses",
-    provider: params.catalogId,
-    model: params.item.model ?? "native-history",
-    usage: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    },
+    provider,
+    model,
+    usage: makeZeroUsageSnapshot(),
     stopReason: "stop",
-  } as AgentMessage;
+  };
 }
 
 function fitSessionCatalogItemToBytes(
@@ -155,6 +163,8 @@ export async function importSessionCatalogHistory(params: {
   agentId: string;
   cwd?: string;
   config: OpenClawConfig;
+  continuationNotice?: string;
+  commitGuard?: () => void;
 }): Promise<void> {
   const items = await readBoundedSessionCatalogHistory({ read: params.read });
   const fallbackTimestamp = Date.now();
@@ -176,6 +186,24 @@ export async function importSessionCatalogHistory(params: {
         message,
         idempotencyLookup: "scan",
         cwd: params.cwd,
+        ...(params.commitGuard ? { beforeCommitInTransaction: params.commitGuard } : {}),
+      });
+    }
+    const notice = params.continuationNotice?.trim();
+    if (notice) {
+      await transcript.appendMessage({
+        message: {
+          ...sessionCatalogAssistantMessage(
+            notice,
+            fallbackTimestamp + items.length,
+            "openclaw",
+            "session-catalog",
+          ),
+          idempotencyKey: `${params.catalogId}-catalog:${params.threadId}:continuation-notice`,
+        },
+        idempotencyLookup: "scan",
+        cwd: params.cwd,
+        ...(params.commitGuard ? { beforeCommitInTransaction: params.commitGuard } : {}),
       });
     }
   });

@@ -155,14 +155,10 @@ function getMergeableLegacyOpenAIModels(params: {
 
 function collectLegacyModelPolicyWildcardPaths(raw: unknown): Map<string, string[]> {
   const pathsByProvider = new Map<string, string[]>();
-  const scopes: Array<{ value: unknown; path: string }> = [];
   visitAgentConfigScopes(getRecord(raw) ?? {}, (agent, path) => {
-    scopes.push({ value: agent.modelPolicy, path: `${path}.modelPolicy` });
-  });
-  for (const scope of scopes) {
-    const allow = getRecord(scope.value)?.allow;
+    const allow = getRecord(agent.modelPolicy)?.allow;
     if (!Array.isArray(allow)) {
-      continue;
+      return;
     }
     for (const [index, entry] of allow.entries()) {
       if (typeof entry !== "string" || !entry.trim().endsWith("/*")) {
@@ -173,10 +169,10 @@ function collectLegacyModelPolicyWildcardPaths(raw: unknown): Map<string, string
         continue;
       }
       const paths = pathsByProvider.get(provider) ?? [];
-      paths.push(`${scope.path}.allow.${index}`);
+      paths.push(`${path}.modelPolicy.allow.${index}`);
       pathsByProvider.set(provider, paths);
     }
-  }
+  });
   return pathsByProvider;
 }
 
@@ -485,7 +481,6 @@ export function migrateLegacyOpenAICodexProvider(
   if (!models || !providers) {
     return;
   }
-  let providersChanged = false;
   const wildcardPaths = collectLegacyModelPolicyWildcardPaths(raw);
   for (const [providerId, providerValue] of Object.entries({ ...providers })) {
     const provider = getRecord(providers[providerId]) ?? getRecord(providerValue);
@@ -499,7 +494,6 @@ export function migrateLegacyOpenAICodexProvider(
     if (!isLegacyCodexProviderId(providerId)) {
       if (normalized.changed) {
         providers[providerId] = normalized.value;
-        providersChanged = true;
       }
       continue;
     }
@@ -542,7 +536,6 @@ export function migrateLegacyOpenAICodexProvider(
       if (modelCollisions.length > 0 || mergeBlockers.length > 0) {
         if (normalized.changed) {
           providers[providerId] = normalized.value;
-          providersChanged = true;
           changes.push(
             modelCollisions.length > 0
               ? `Skipped merging models.providers.${providerId} into models.providers.${OPENAI_PROVIDER_ID} because colliding model definitions differ for: ${modelCollisions.join(", ")}.`
@@ -579,10 +572,6 @@ export function migrateLegacyOpenAICodexProvider(
       }
     }
     delete providers[providerId];
-    providersChanged = true;
-  }
-  if (providersChanged) {
-    models.providers = providers;
   }
 }
 

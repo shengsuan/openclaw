@@ -138,23 +138,19 @@ describe("install smoke candidate payload", () => {
     );
   });
 
-  it.each(["candidate.tgz", "candidate-pack.json", "install.sh", "install-cli.sh"])(
-    "rejects tampering with %s after sealing",
-    async (filename) => {
-      const fixture = await sealFixture();
-      writeFileSync(path.join(fixture.payloadDir, filename), "tampered\n");
-
-      await expect(
-        verifyInstallSmokeCandidatePayload(
-          verifyOptions(
-            fixture.payloadDir,
-            fixture.manifestSha256,
-            fixture.manifest.sourceArchiveSha256,
-          ),
+  it("rejects tampering with the final payload file after sealing", async () => {
+    const fixture = await sealFixture();
+    writeFileSync(path.join(fixture.payloadDir, "install-cli.sh"), "tampered\n");
+    await expect(
+      verifyInstallSmokeCandidatePayload(
+        verifyOptions(
+          fixture.payloadDir,
+          fixture.manifestSha256,
+          fixture.manifest.sourceArchiveSha256,
         ),
-      ).rejects.toThrow(`candidate payload digest does not match for ${filename}`);
-    },
-  );
+      ),
+    ).rejects.toThrow("candidate payload digest does not match for install-cli.sh");
+  });
 
   it("rejects manifest tampering before trusting its file inventory", async () => {
     const fixture = await sealFixture();

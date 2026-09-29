@@ -4,7 +4,7 @@ services:
       context: .
       args:
         - OPENCLAW_TIMEZONE=${OPENCLAW_TIMEZONE:-Asia/Shanghai}
-        - OPENCLAW_HOME=${OPENCLAW_HOME:-/home/node}
+        - OPENCLAW_HOME=${OPENCLAW_HOME:-/root}
         - OPENCLAW_SESSION_WRITE_LOCK_ACQUIRE_TIMEOUT_MS="120000"
         - OPENCLAW_SESSION_WRITE_LOCK_MAX_HOLD_MS="180000"
 
@@ -32,7 +32,14 @@ services:
       - .env
     environment:
       OPENCLAW_TIMEZONE: ${OPENCLAW_TIMEZONE:-Asia/Shanghai}
-      OPENCLAW_HOME: ${OPENCLAW_HOME:-/home/node}
+      # 以 root 运行，状态/配置/工作区统一固定到 /root/.openclaw，
+      # 避免与 cfg.sh 初始化路径分裂，并让 SQLite 状态库落到持久卷（离开 overlayfs）。
+      HOME: /root
+      OPENCLAW_HOME: /root
+      OPENCLAW_STATE_DIR: /root/.openclaw
+      OPENCLAW_CONFIG_PATH: /root/.openclaw/openclaw.json
+      OPENCLAW_CONFIG_DIR: /root/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /root/.openclaw/workspace
       TERM: xterm-256color
       OPENCLAW_SESSION_WRITE_LOCK_ACQUIRE_TIMEOUT_MS: "120000"
       OPENCLAW_SESSION_WRITE_LOCK_MAX_HOLD_MS: "180000"
@@ -56,15 +63,15 @@ services:
       # 构建时加 --build-arg OPENCLAW_INSTALL_DOCKER_CLI=1，或使用 OPENCLAW_SANDBOX=1 自动配置。
       # DOCKER_GID 设为宿主机 docker 组 GID（命令：stat -c '%g' /var/run/docker.sock）。
       - /var/run/docker.sock:/var/run/docker.sock
+      # 持久化状态目录（含 SQLite 状态库），离开 overlayfs 可写层，
+      # 避免 copy-up 改变 openclaw.sqlite 的 inode 导致 "identity changed" 启动失败。
+      - openclaw-state:/root/.openclaw
     # group_add:
     #   - "${DOCKER_GID:-999}"
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-10789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-10790}:18790"
       - "${SSH_EXPOSE_PORT:-10722}:22"
-    command: >
-      sh -c "find /root/.openclaw/agents /home/node/.openclaw/agents
-      -name '*.lock' -delete 2>/dev/null || true && openclaw gateway"
     init: true
     restart: unless-stopped
     user: "0:0"  # root：允许 SSH 服务访问宿主密钥
@@ -77,6 +84,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+volumes:
+  openclaw-state:
 
 secrets:
   ssh_key:

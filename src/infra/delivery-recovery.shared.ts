@@ -1,9 +1,11 @@
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import {
   resolveDateTimestampMs,
   resolveExpiresAtMsFromDurationMs,
   resolveNonNegativeIntegerOption,
 } from "../../packages/normalization-core/src/number-coercion.js";
 import { computeBackoffSchedule } from "../../packages/retry/src/index.js";
+import { createDeferredCore } from "../shared/deferred.js";
 import { sleep } from "../utils/sleep.js";
 import { collectErrorGraphCandidates, extractErrorCode } from "./errors.js";
 import {
@@ -178,6 +180,49 @@ export function findPlatformMessageRejectedError(
   return undefined;
 }
 
+/**
+ * Returns the typed no-send marker's retry decision after proving the full error graph.
+ * Untyped pre-connect proof stays undefined so caller-specific text policy keeps precedence.
+ */
+export function resolveDeliveryNotSentRetryability(err: unknown): boolean | undefined {
+  const candidates = collectErrorGraphCandidates(err, nestedErrorCandidates);
+  if (
+    !candidates.some(isPlatformMessageNotDispatchedError) ||
+    !isProvenDeliveryNotSentError(err) ||
+    hasDeliverySendEvidence(candidates)
+  ) {
+    return undefined;
+  }
+  return findPlatformMessageRejectedError(err) === undefined;
+}
+
+function hasDeliverySendEvidence(candidates: readonly unknown[]): boolean {
+  return candidates.some(
+    (candidate) =>
+      isRecord(candidate) &&
+      (candidate.sentBeforeError === true ||
+        candidate.visibleReplySent === true ||
+        (isRecord(candidate.deliveryResult) && candidate.deliveryResult.visibleReplySent === true)),
+  );
+}
+
+/** True only when the complete error graph proves a retryable recipient no-send. */
+export function isRetryableDeliveryNotSentError(err: unknown): boolean {
+  const typedRetryability = resolveDeliveryNotSentRetryability(err);
+  return (
+    typedRetryability ??
+    (isProvenDeliveryNotSentError(err) &&
+      !hasDeliverySendEvidence(collectErrorGraphCandidates(err, nestedErrorCandidates)))
+  );
+}
+
+/** True when the durable queue retained the exact failed attempt for recovery. */
+export function isDeliveryRecoveryOwnedRetry(err: unknown): boolean {
+  return collectErrorGraphCandidates(err, nestedErrorCandidates).some(
+    (candidate) => isOutboundDeliveryError(candidate) && candidate.queueCustody === "held",
+  );
+}
+
 export function computeBackoffMs(retryCount: number): number {
   return computeBackoffSchedule(RECOVERY_BACKOFF_MS, retryCount);
 }
@@ -196,11 +241,9 @@ function createRecoveryReplayPacer(): {
 
   return {
     async wait(deadlineMs) {
-      let releaseWaiter: () => void = () => {};
       const previousWaiter = waitQueue;
-      waitQueue = new Promise<void>((resolve) => {
-        releaseWaiter = resolve;
-      });
+      const completion = createDeferredCore();
+      waitQueue = completion.promise;
       await previousWaiter;
 
       try {
@@ -223,7 +266,7 @@ function createRecoveryReplayPacer(): {
         lastReplayStartedAt = Date.now();
         return "ready";
       } finally {
-        releaseWaiter();
+        completion.resolve();
       }
     },
   };
