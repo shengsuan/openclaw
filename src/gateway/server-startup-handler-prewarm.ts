@@ -84,6 +84,16 @@ function gatewayPrewarmItems(
       },
     },
     {
+      name: "shengsuanyun-generate-tools",
+      load: async () => {
+        const { preloadShengSuanYunTools } =
+          await import("../agents/tools/shengsuanyun/generate.js");
+        if (!isCancelled()) {
+          await preloadShengSuanYunTools({ config: getConfig() });
+        }
+      },
+    },
+    {
       name: "memory-search",
       load: async () => {
         const { getMemoryCapabilityRegistration } = await import("../plugins/memory-state.js");

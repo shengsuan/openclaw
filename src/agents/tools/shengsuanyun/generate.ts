@@ -1,6 +1,8 @@
 import {
   getShengSuanYunModalityModels,
+  loadShengSuanYunModalityModelsCache,
   SHENGSUANYUN_BASE_URL,
+  type MModel,
 } from "@openclaw/shengsuanyun/provider-catalog.ts";
 import { Type, type TSchema } from "typebox";
 import type { OpenClawConfig } from "../../../config/config.ts";
@@ -138,11 +140,13 @@ function sanitizeToolName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/_+/g, "_");
 }
 
-async function loadShengSuanYunTools(opts?: {
-  config?: OpenClawConfig;
-  workspaceDir?: string;
-}): Promise<AnyAgentTool[]> {
-  const models = await getShengSuanYunModalityModels();
+function buildShengSuanYunTools(
+  models: MModel[],
+  opts?: {
+    config?: OpenClawConfig;
+    workspaceDir?: string;
+  },
+): AnyAgentTool[] {
   const tools: AnyAgentTool[] = [];
   for (const model of models) {
     const label = `${model.company_name} ${model.model_name} Generate tool`;
@@ -305,6 +309,14 @@ async function loadShengSuanYunTools(opts?: {
   return tools;
 }
 
+async function loadShengSuanYunTools(opts?: {
+  config?: OpenClawConfig;
+  workspaceDir?: string;
+}): Promise<AnyAgentTool[]> {
+  const models = await getShengSuanYunModalityModels();
+  return buildShengSuanYunTools(models, opts);
+}
+
 interface JsonSchema {
   $schema?: string;
   type?: string;
@@ -456,8 +468,18 @@ export function createGenerateTools(opts?: {
     log.info(`[shengsuanyun-generate] Returning ${cachedTools.length} cached tools`);
     return cachedTools;
   }
+
+  const cachedModels = loadShengSuanYunModalityModelsCache();
+  if (cachedModels && cachedModels.length > 0) {
+    cachedTools = buildShengSuanYunTools(cachedModels, opts);
+    log.info(
+      `[shengsuanyun-generate] Built ${cachedTools.length} tools synchronously from disk cache`,
+    );
+    return cachedTools;
+  }
+
   log.info(
-    "[shengsuanyun-generate] cachedTools is null, starting background preload and returning fallback tools",
+    "[shengsuanyun-generate] cachedTools is null and disk cache is cold, starting background preload and returning fallback tools",
   );
   preloadShengSuanYunTools(opts).catch((err) => {
     console.error("[shengsuanyun-generate] Background preload failed:", err);

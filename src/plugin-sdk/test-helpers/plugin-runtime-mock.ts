@@ -53,23 +53,8 @@ export const createTestInboundDebounceFlush: InboundDebounceFlushFactory = (para
   return { admission: completion, completion };
 };
 
-<<<<<<< HEAD
 const DEFAULT_PROVIDER = "shengsuanyun";
 const DEFAULT_MODEL = "anthropic/claude-opus-5";
-
-type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends (...args: never[]) => unknown
-    ? T[K]
-    : T[K] extends ReadonlyArray<unknown>
-      ? T[K]
-      : T[K] extends object
-        ? DeepPartial<T[K]>
-        : T[K];
-};
-=======
-const DEFAULT_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-6-astra";
->>>>>>> 0a4ea23673c20571e15c62eb83fbce742274197f
 
 type BuildContextParams = Parameters<PluginRuntime["channel"]["inbound"]["buildContext"]>[0];
 type BuildContextResult = ReturnType<PluginRuntime["channel"]["inbound"]["buildContext"]>;

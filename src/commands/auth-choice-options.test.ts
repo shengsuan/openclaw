@@ -112,68 +112,6 @@ describe("buildAuthChoiceOptions", () => {
       }),
     ]);
 
-<<<<<<< HEAD
-    const optionValues = options.map((option) => option.value);
-    for (const expectedValue of [
-      "github-copilot",
-      "zai-api-key",
-      "xiaomi-api-key",
-      "xiaomi-token-plan-ams",
-      "xiaomi-token-plan-cn",
-      "xiaomi-token-plan-sgp",
-      "minimax-global-api",
-      "moonshot-api-key",
-      "together-api-key",
-      "shengsuanyun-api-key",
-      "chutes",
-      "xai-api-key",
-      "mistral-api-key",
-      "volcengine-api-key",
-      "byteplus-api-key",
-      "vllm",
-      "opencode-go",
-      "ollama",
-      "sglang",
-    ]) {
-      expect(optionValues).toContain(expectedValue);
-    }
-  });
-
-  it("builds cli help choices from the same runtime catalog", () => {
-    resolveManifestProviderAuthChoices.mockReturnValue([
-      {
-        pluginId: "chutes",
-        providerId: "chutes",
-        methodId: "oauth",
-        choiceId: "chutes",
-        choiceLabel: "Chutes (OAuth)",
-      },
-      {
-        pluginId: "litellm",
-        providerId: "litellm",
-        methodId: "api-key",
-        choiceId: "litellm-api-key",
-        choiceLabel: "LiteLLM API key",
-      },
-      {
-        pluginId: "openai",
-        providerId: "openai",
-        methodId: "api-key",
-        choiceId: "openai-api-key",
-        choiceLabel: "OpenAI API key",
-      },
-    ]);
-    resolveProviderWizardOptions.mockReturnValue([
-      {
-        value: "ollama",
-        label: "Ollama",
-        hint: "Cloud and local open models",
-        groupId: "ollama",
-        groupLabel: "Ollama",
-      },
-    ]);
-=======
->>>>>>> 0a4ea23673c20571e15c62eb83fbce742274197f
     const options = getOptions(true);
     const cliChoices = formatAuthChoiceChoicesForCli({
       includeSkip: true,

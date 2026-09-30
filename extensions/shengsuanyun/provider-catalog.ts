@@ -5,8 +5,6 @@ import type { ModelDefinitionConfig } from "openclaw/plugin-sdk/provider-model-s
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 
-// The public catalog and OpenAI-compatible routes are versioned under /api/v1.
-// Anthropic transport removes the trailing /v1 before appending /v1/messages.
 export const SHENGSUANYUN_BASE_URL = "https://router.shengsuanyun.com/api/v1";
 export const SHENGSUANYUN_MODALITIES_BASE_URL = "https://api.shengsuanyun.com/modelrouter";
 
@@ -21,8 +19,6 @@ function getCachePath(name: string) {
 
 type CacheWrap<T> = { timestamp: number; data: T };
 
-// saveCache is the only writer; validating the envelope instead of asserting it
-// lets corrupt or foreign cache files degrade to a cache miss.
 function isCacheEnvelope<T>(value: unknown): value is CacheWrap<T> {
   return (
     typeof value === "object" &&
@@ -179,8 +175,13 @@ interface ShengSuanYunModalitiesResponse {
   data: { infos: { id: number }[] };
 }
 
+const SSY_MODALITIES_CACHE_KEY = "ssy_modalities";
+export function loadShengSuanYunModalityModelsCache(): MModel[] | null {
+  return loadCache<MModel[]>(SSY_MODALITIES_CACHE_KEY);
+}
+
 export async function getShengSuanYunModalityModels(): Promise<MModel[]> {
-  const cacheKey = "ssy_modalities";
+  const cacheKey = SSY_MODALITIES_CACHE_KEY;
   if (process.env.NODE_ENV === "test" || process.env.VITEST) {
     return loadCache<MModel[]>(cacheKey) ?? [];
   }
